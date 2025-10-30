@@ -61,87 +61,120 @@ print_info() {
 # SISTEMA DE SENHA PROFISSIONAL COM CAMPO VISUAL
 # ════════════════════════════════════════════════════════════════
 
+draw_password_box() {
+    local password_display="$1"
+    local has_content="$2"
+    
+    echo -e "${CYAN}┌────────────────────────────────────────────────────┐${RESET}"
+    
+    if [ "$has_content" = "true" ]; then
+        echo -e "${CYAN}│${RESET} Digite sua senha: ${BOLD}${password_display}${RESET}"
+    else
+        echo -e "${CYAN}│${RESET} Digite sua senha: ${DIM}(aguardando...)${RESET}"
+    fi
+    
+    echo -e "${CYAN}└────────────────────────────────────────────────────┘${RESET}"
+}
+
+clear_password_box() {
+    # Move cursor 3 linhas para cima e limpa
+    echo -ne "\033[3A"
+    echo -ne "\033[J"
+}
+
 read_password_secure() {
+    local prompt="$1"
     local password=""
     local char=""
+    local show_chars="${2:-true}"
     
     # Desenha o box inicial
     echo ""
-    echo -e "${CYAN}┌────────────────────────────────────────────────────┐${RESET}"
-    echo -e "${CYAN}│${RESET} Digite sua senha aqui: ${DIM}(aguardando...)${RESET}"
-    echo -e "${CYAN}└────────────────────────────────────────────────────┘${RESET}"
-    
-    # Move cursor para posição de digitação (2 linhas acima, coluna 25)
-    echo -ne "\033[2A\033[25G"
+    draw_password_box "" "false"
     
     # Salva configuração do terminal
-    local old_stty=""
     if [ -t 0 ]; then
-        old_stty=$(stty -g 2>/dev/null)
-        stty -echo -icanon 2>/dev/null
+        local old_stty=$(stty -g 2>/dev/null)
+        stty -echo -icanon min 1 time 0 2>/dev/null
     fi
     
     while true; do
-        # Lê um caractere
-        char=""
-        IFS= read -r -n1 -s char 2>/dev/null || true
-        
-        # Enter (finaliza)
-        if [[ "$char" == $'\n' ]] || [[ "$char" == $'\r' ]] || [[ "$char" == "" && ${#password} -gt 0 ]]; then
+        # Lê um caractere por vez
+        if IFS= read -r -n1 -s char 2>/dev/null; then
+            # Enter (código ASCII 10 ou 13)
+            if [[ "$char" == $'\n' ]] || [[ "$char" == $'\r' ]] || [[ -z "$char" ]]; then
+                break
+            fi
+            
+            # Backspace (código ASCII 127 ou 8)
+            if [[ "$char" == $'\177' ]] || [[ "$char" == $'\b' ]]; then
+                if [ ${#password} -gt 0 ]; then
+                    password="${password%?}"
+                    
+                    # Atualiza o box
+                    clear_password_box
+                    
+                    if [ ${#password} -eq 0 ]; then
+                        draw_password_box "" "false"
+                    else
+                        local display=""
+                        for ((i=0; i<${#password}; i++)); do
+                            display+="●"
+                        done
+                        draw_password_box "$display" "true"
+                    fi
+                fi
+                continue
+            fi
+            
+            # Ctrl+C (código ASCII 3)
+            if [[ "$char" == $'\003' ]]; then
+                echo ""
+                if [ -t 0 ]; then
+                    stty "$old_stty" 2>/dev/null
+                fi
+                return 130
+            fi
+            
+            # Adiciona caractere à senha
+            password+="$char"
+            
+            # Atualiza o box com os asteriscos
+            clear_password_box
+            
+            local display=""
+            if [ "$show_chars" = "true" ]; then
+                for ((i=0; i<${#password}; i++)); do
+                    display+="●"
+                done
+            fi
+            
+            draw_password_box "$display" "true"
+        else
             break
         fi
-        
-        # Enter vazio (ignora)
-        if [[ "$char" == $'\n' ]] || [[ "$char" == $'\r' ]] || [[ "$char" == "" ]]; then
-            continue
-        fi
-        
-        # Backspace
-        if [[ "$char" == $'\177' ]] || [[ "$char" == $'\b' ]] || [[ "$char" == $'\x7f' ]]; then
-            if [ ${#password} -gt 0 ]; then
-                password="${password%?}"
-                echo -ne "\b \b"
-            fi
-            continue
-        fi
-        
-        # Ctrl+C
-        if [[ "$char" == $'\003' ]]; then
-            if [ -t 0 ] && [ -n "$old_stty" ]; then
-                stty "$old_stty" 2>/dev/null
-            fi
-            echo -ne "\033[2B\n"
-            return 130
-        fi
-        
-        # Adiciona caractere à senha
-        password+="$char"
-        echo -n "●"
     done
     
-    # Restaura terminal
-    if [ -t 0 ] && [ -n "$old_stty" ]; then
+    # Restaura configuração do terminal
+    if [ -t 0 ]; then
         stty "$old_stty" 2>/dev/null
     fi
     
-    # Move cursor para baixo da box
-    echo -ne "\033[2B\n"
-    
+    echo ""
     echo "$password"
-    return 0
 }
 
 verify_zip_has_password() {
     local zipfile="$1"
     
-    # Tenta listar conteúdo sem senha
-    if unzip -l "$zipfile" >/dev/null 2>&1; then
+    # Tenta extrair primeiro arquivo sem senha
+    if unzip -t "$zipfile" >/dev/null 2>&1; then
         return 1  # Sem senha
     fi
     
     # Verifica se o erro é por senha
-    local test_output=$(unzip -l "$zipfile" 2>&1)
-    if echo "$test_output" | grep -qi "password\|encrypted"; then
+    local test_output=$(unzip -t "$zipfile" 2>&1)
+    if echo "$test_output" | grep -qi "password"; then
         return 0  # Com senha
     fi
     
@@ -166,34 +199,32 @@ extract_zip_smart() {
     echo ""
     
     # Primeira tentativa: sem senha
-    print_info "Verificando proteção do arquivo..."
-    sleep 1
+    print_info "Verificando necessidade de senha..."
+    sleep 0.5
     
+    if unzip -q -o -d "." "$zipfile" 2>/dev/null; then
+        print_success "Extração concluída sem senha!"
+        rm -f "$zipfile"
+        return 0
+    fi
+    
+    # Verifica tipo de proteção
     verify_zip_has_password "$zipfile"
     local has_password=$?
     
     if [ $has_password -eq 1 ]; then
-        # Sem senha - extrai direto
-        print_success "Arquivo sem proteção detectado"
-        print_info "Extraindo conteúdo..."
-        
-        if unzip -q -o -d "." "$zipfile" 2>/dev/null; then
-            print_success "Extração concluída com sucesso!"
-            rm -f "$zipfile"
-            return 0
-        else
-            print_error "Erro ao extrair arquivo"
-            return 1
-        fi
-    elif [ $has_password -eq 2 ]; then
         print_error "Arquivo corrompido ou formato inválido"
         print_info "Arquivo mantido: ${BOLD}$zipfile${RESET}"
+        return 1
+    elif [ $has_password -eq 2 ]; then
+        print_error "Erro desconhecido ao processar ZIP"
+        print_info "Tente extrair manualmente: ${BOLD}unzip $zipfile${RESET}"
         return 1
     fi
     
     # Arquivo protegido por senha
     echo ""
-    print_warning "🔒 Arquivo protegido por senha detectado"
+    print_warning "Arquivo protegido por senha detectado"
     echo ""
     
     # Loop de tentativas
@@ -202,17 +233,16 @@ extract_zip_smart() {
         
         # Dicas antes da primeira tentativa
         if [ $attempt -eq 1 ]; then
-            echo -e "${YELLOW}💡 Instruções:${RESET}"
-            echo "  • Digite a senha no campo abaixo"
-            echo "  • A senha será exibida como bolinhas (●●●●)"
-            echo "  • Use Backspace para corrigir"
-            echo "  • Pressione Enter quando terminar"
+            echo -e "${YELLOW}💡 Dicas:${RESET}"
+            echo "  • Digite a senha com cuidado"
             echo "  • Verifique se Caps Lock está desativado"
+            echo "  • A senha será exibida como bolinhas (●●●●)"
+            echo "  • Use Backspace para corrigir erros"
             echo ""
         fi
         
         # Lê a senha com o campo visual
-        local password=$(read_password_secure)
+        local password=$(read_password_secure "🔑 Digite a senha:")
         local read_status=$?
         
         # Verifica se foi cancelado (Ctrl+C)
@@ -225,8 +255,7 @@ extract_zip_smart() {
         
         # Verifica se a senha está vazia
         if [ -z "$password" ]; then
-            echo ""
-            print_warning "Senha vazia detectada"
+            print_warning "Senha vazia não é válida"
             
             if [ $attempt -lt $max_attempts ]; then
                 echo ""
@@ -245,25 +274,23 @@ extract_zip_smart() {
         # Tenta extrair com a senha
         echo ""
         print_info "Tentando extrair com a senha fornecida..."
-        sleep 0.5
         
         if unzip -q -o -P "$password" -d "." "$zipfile" 2>/dev/null; then
             echo ""
-            print_success "✅ Extração concluída com sucesso!"
+            print_success "Extração concluída com sucesso!"
             rm -f "$zipfile"
             return 0
         else
-            echo ""
-            print_error "❌ Senha incorreta"
+            print_error "Senha incorreta"
             
             if [ $attempt -lt $max_attempts ]; then
                 echo ""
                 echo -e "${YELLOW}💡 Sugestões:${RESET}"
                 echo "  • Verifique se copiou a senha corretamente"
                 echo "  • Confirme com quem enviou o arquivo"
-                echo "  • Atenção para maiúsculas e minúsculas"
-                echo "  • Verifique espaços extras"
-                sleep 1.5
+                echo "  • Tente desativar Caps Lock"
+                echo "  • Verifique se há espaços antes ou depois da senha"
+                sleep 1
             fi
         fi
         
@@ -273,7 +300,7 @@ extract_zip_smart() {
     # Todas as tentativas falharam
     print_step "⚠️ Limite de Tentativas Atingido"
     
-    print_error "Não foi possível extrair o arquivo após $max_attempts tentativas"
+    print_error "Não foi possível extrair o arquivo"
     print_info "Arquivo mantido: ${BOLD}$zipfile${RESET}"
     echo ""
     echo -e "${YELLOW}Você pode tentar manualmente:${RESET}"
