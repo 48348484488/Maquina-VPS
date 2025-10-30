@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║  🚀 INSTALADOR WINE PAWN v4.0 - ULTRA SIMPLIFICADO           ║
+# ║  🚀 INSTALADOR WINE PAWN v4.1 - ULTRA SIMPLIFICADO           ║
 # ║  Automatizado • Inteligente • Rápido                         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-set -e  # Para em caso de erro
+set -e
 
 # ═══════════════════════════════════════════════════════════════
 # 🎨 CORES E ESTILO
@@ -18,7 +18,7 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # ═══════════════════════════════════════════════════════════════
 # 🔧 FUNÇÕES AUXILIARES
@@ -27,7 +27,7 @@ NC='\033[0m' # No Color
 print_header() {
     clear
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║${WHITE}  🚀 INSTALADOR WINE PAWN v4.0                                ${CYAN}║${NC}"
+    echo -e "${CYAN}║${WHITE}  🚀 INSTALADOR WINE PAWN v4.1                                ${CYAN}║${NC}"
     echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -77,7 +77,7 @@ read_password() {
     local password=""
     local char=""
     
-    echo -ne "${CYAN}$prompt${NC}"
+    echo -n "${prompt}"
     
     stty -echo 2>/dev/null
     
@@ -103,6 +103,14 @@ read_password() {
     echo "$password"
 }
 
+verify_zip_password() {
+    local zipfile="$1"
+    local password="$2"
+    
+    unzip -t -P "$password" "$zipfile" >/dev/null 2>&1
+    return $?
+}
+
 # ═══════════════════════════════════════════════════════════════
 # 🔐 SISTEMA DE EXTRAÇÃO INTELIGENTE
 # ═══════════════════════════════════════════════════════════════
@@ -113,7 +121,6 @@ smart_extract() {
     
     print_step "🔓 Sistema de Extração Inteligente"
     
-    # Verifica se arquivo existe
     if [ ! -f "$zipfile" ]; then
         print_error "Arquivo não encontrado: $zipfile"
         return 1
@@ -121,24 +128,26 @@ smart_extract() {
     
     print_info "Analisando: $zipfile [$(du -h "$zipfile" | cut -f1)]"
     
-    # Tenta extrair sem senha primeiro
-    echo -ne "${BLUE}▶${NC} Tentando extrair automaticamente... "
-    if unzip -q -o "$zipfile" 2>/dev/null; then
+    echo -ne "${BLUE}▶${NC} Testando arquivo sem senha... "
+    if unzip -t "$zipfile" >/dev/null 2>&1; then
         echo -e "${GREEN}OK${NC}"
-        print_success "Extração concluída!"
-        rm -f "$zipfile"
-        return 0
+        echo -ne "${BLUE}▶${NC} Extraindo... "
+        if unzip -q -o "$zipfile" 2>/dev/null; then
+            echo -e "${GREEN}OK${NC}"
+            print_success "Extração concluída!"
+            rm -f "$zipfile"
+            return 0
+        fi
     fi
     echo -e "${YELLOW}SENHA NECESSÁRIA${NC}"
     
-    # Precisa de senha
     print_warning "Arquivo protegido por senha detectado"
     echo ""
     
     for attempt in $(seq 1 $max_attempts); do
         echo -e "${CYAN}╭─ Tentativa ${attempt}/${max_attempts}${NC}"
         
-        local password=$(read_password "│ 🔑 Senha: ")
+        local password=$(read_password "${CYAN}│${NC} 🔑 Digite a senha: ")
         
         if [ -z "$password" ]; then
             echo -e "${CYAN}╰─${NC}"
@@ -151,16 +160,26 @@ smart_extract() {
             continue
         fi
         
-        echo -ne "${CYAN}│${NC} ${BLUE}▶${NC} Extraindo com senha... "
+        echo -ne "${CYAN}│${NC} ${BLUE}▶${NC} Verificando senha... "
         
-        if unzip -q -o -P "$password" "$zipfile" 2>/dev/null; then
-            echo -e "${GREEN}OK${NC}"
-            echo -e "${CYAN}╰─${NC}"
-            print_success "Extração concluída com sucesso!"
-            rm -f "$zipfile"
-            return 0
+        if verify_zip_password "$zipfile" "$password"; then
+            echo -e "${GREEN}CORRETA${NC}"
+            echo -ne "${CYAN}│${NC} ${BLUE}▶${NC} Extraindo arquivos... "
+            
+            if unzip -q -o -P "$password" "$zipfile" 2>/dev/null; then
+                echo -e "${GREEN}OK${NC}"
+                echo -e "${CYAN}╰─${NC}"
+                print_success "Extração concluída com sucesso!"
+                rm -f "$zipfile"
+                return 0
+            else
+                echo -e "${RED}ERRO${NC}"
+                echo -e "${CYAN}╰─${NC}"
+                print_error "Falha na extração"
+                return 1
+            fi
         else
-            echo -e "${RED}FALHOU${NC}"
+            echo -e "${RED}INCORRETA${NC}"
             echo -e "${CYAN}╰─${NC}"
             print_error "Senha incorreta"
             
@@ -204,7 +223,6 @@ print_header
 
 print_step "📋 Etapa 1/5 • Verificação do Sistema"
 
-# Dependências básicas
 print_info "Verificando dependências..."
 install_package "unzip" "UnZip"
 install_package "zip" "Zip"
@@ -219,12 +237,10 @@ if command -v wine >/dev/null 2>&1; then
 else
     print_info "Instalando Wine 32-bit (pode levar 2-5 minutos)..."
     
-    # Limpeza
     sudo apt remove --purge wine wine32 wine64 -y >/dev/null 2>&1
     sudo apt autoremove -y >/dev/null 2>&1
     rm -rf ~/.wine 2>/dev/null
     
-    # Configuração
     echo -ne "${BLUE}▶${NC} Configurando repositórios... "
     sudo dpkg --add-architecture i386 >/dev/null 2>&1
     sudo apt update >/dev/null 2>&1
@@ -233,13 +249,11 @@ else
     sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources 2>/dev/null
     echo -e "${GREEN}OK${NC}"
     
-    # Instalação
     echo -ne "${BLUE}▶${NC} Instalando Wine... "
     sudo apt update >/dev/null 2>&1
     sudo apt install --install-recommends winehq-stable -y >/dev/null 2>&1 &
     spinner $! ""
     
-    # Configuração do ambiente
     mkdir -p ~/.wine-runtime
     chmod 700 ~/.wine-runtime
     
@@ -252,7 +266,6 @@ else
     wineboot -u >/dev/null 2>&1 &
     spinner $! "Inicializando Wine..."
     
-    # Persistir configurações
     if ! grep -q "WINEARCH=win32" ~/.bashrc; then
         cat >> ~/.bashrc << 'EOF'
 
@@ -284,7 +297,6 @@ print_step "⚙️  Etapa 3/5 • Configuração VS Code"
 
 mkdir -p .vscode
 
-# Settings.json
 cat > .vscode/settings.json << 'EOF'
 {
     "terminal.integrated.env.linux": {
@@ -298,7 +310,6 @@ cat > .vscode/settings.json << 'EOF'
 EOF
 print_success "settings.json configurado"
 
-# Tasks.json
 echo -ne "${BLUE}▶${NC} Baixando tasks.json... "
 wget -q https://github.com/48348484488/Maquina-VPS/raw/74c1d4876c3342d3df52d7db0142fef90f05f4bd/task.zip -O task.zip 2>&1
 
@@ -418,14 +429,12 @@ echo ""
 echo -e "${BOLD}📊 COMPONENTES INSTALADOS:${NC}"
 echo ""
 
-# Wine
 if command -v wine >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} Wine: ${CYAN}$(wine --version 2>/dev/null)${NC}"
 else
     echo -e "  ${RED}✗${NC} Wine: ${YELLOW}Execute 'source ~/.bashrc'${NC}"
 fi
 
-# Compilador
 if [ -f "pawno/pawncc.exe" ]; then
     echo -e "  ${GREEN}✓${NC} Compilador: ${CYAN}pawno/pawncc.exe${NC}"
 elif [ -f "pawncc/pawncc.exe" ]; then
@@ -434,14 +443,12 @@ else
     echo -e "  ${YELLOW}⚠${NC} Compilador: ${YELLOW}Aguardando upload${NC}"
 fi
 
-# VS Code
 if [ -f ".vscode/settings.json" ] && [ -f ".vscode/tasks.json" ]; then
     echo -e "  ${GREEN}✓${NC} VS Code: ${CYAN}Configurado${NC}"
 else
     echo -e "  ${RED}✗${NC} VS Code: ${YELLOW}Configuração incompleta${NC}"
 fi
 
-# Playit
 if command -v playit >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} Playit: ${CYAN}Instalado${NC}"
 else
@@ -475,4 +482,4 @@ fi
 
 echo ""
 echo -e "${GREEN}✓${NC} Tudo pronto! Boa sorte com seu projeto Pawn! 🎉"
-echo
+echo ""
