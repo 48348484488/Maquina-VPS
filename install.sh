@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ════════════════════════════════════════════════════════════════
-# Instalador Wine Pawn + Playit v4.0
-# Sistema de senha profissional + Interface moderna
+# Instalador Wine Pawn + Playit v4.1
+# Sistema de senha profissional + Interface moderna + Campo Visual
 # ════════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -19,6 +19,7 @@ CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 RESET='\033[0m'
+DIM='\033[2m'
 
 # ════════════════════════════════════════════════════════════════
 # FUNÇÕES DE UTILIDADE
@@ -27,7 +28,7 @@ RESET='\033[0m'
 print_header() {
     clear
     echo -e "${CYAN}╔════════════════════════════════════════════════════╗${RESET}"
-    echo -e "${CYAN}║${RESET}  ${BOLD}🚀 Instalador Wine Pawn + Playit v4.0${RESET}          ${CYAN}║${RESET}"
+    echo -e "${CYAN}║${RESET}  ${BOLD}🚀 Instalador Wine Pawn + Playit v4.1${RESET}          ${CYAN}║${RESET}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════╝${RESET}"
     echo ""
 }
@@ -57,8 +58,29 @@ print_info() {
 }
 
 # ════════════════════════════════════════════════════════════════
-# SISTEMA DE SENHA PROFISSIONAL
+# SISTEMA DE SENHA PROFISSIONAL COM CAMPO VISUAL
 # ════════════════════════════════════════════════════════════════
+
+draw_password_box() {
+    local password_display="$1"
+    local has_content="$2"
+    
+    echo -e "${CYAN}┌────────────────────────────────────────────────────┐${RESET}"
+    
+    if [ "$has_content" = "true" ]; then
+        echo -e "${CYAN}│${RESET} Digite sua senha: ${BOLD}${password_display}${RESET}"
+    else
+        echo -e "${CYAN}│${RESET} Digite sua senha: ${DIM}(aguardando...)${RESET}"
+    fi
+    
+    echo -e "${CYAN}└────────────────────────────────────────────────────┘${RESET}"
+}
+
+clear_password_box() {
+    # Move cursor 3 linhas para cima e limpa
+    echo -ne "\033[3A"
+    echo -ne "\033[J"
+}
 
 read_password_secure() {
     local prompt="$1"
@@ -66,7 +88,9 @@ read_password_secure() {
     local char=""
     local show_chars="${2:-true}"
     
-    echo -ne "${CYAN}${prompt}${RESET} "
+    # Desenha o box inicial
+    echo ""
+    draw_password_box "" "false"
     
     # Salva configuração do terminal
     if [ -t 0 ]; then
@@ -86,7 +110,19 @@ read_password_secure() {
             if [[ "$char" == $'\177' ]] || [[ "$char" == $'\b' ]]; then
                 if [ ${#password} -gt 0 ]; then
                     password="${password%?}"
-                    echo -ne "\b \b"
+                    
+                    # Atualiza o box
+                    clear_password_box
+                    
+                    if [ ${#password} -eq 0 ]; then
+                        draw_password_box "" "false"
+                    else
+                        local display=""
+                        for ((i=0; i<${#password}; i++)); do
+                            display+="●"
+                        done
+                        draw_password_box "$display" "true"
+                    fi
                 fi
                 continue
             fi
@@ -103,10 +139,17 @@ read_password_secure() {
             # Adiciona caractere à senha
             password+="$char"
             
-            # Mostra asterisco ou oculta completamente
+            # Atualiza o box com os asteriscos
+            clear_password_box
+            
+            local display=""
             if [ "$show_chars" = "true" ]; then
-                echo -n "*"
+                for ((i=0; i<${#password}; i++)); do
+                    display+="●"
+                done
             fi
+            
+            draw_password_box "$display" "true"
         else
             break
         fi
@@ -193,11 +236,12 @@ extract_zip_smart() {
             echo -e "${YELLOW}💡 Dicas:${RESET}"
             echo "  • Digite a senha com cuidado"
             echo "  • Verifique se Caps Lock está desativado"
-            echo "  • A senha não será exibida enquanto digita"
+            echo "  • A senha será exibida como bolinhas (●●●●)"
+            echo "  • Use Backspace para corrigir erros"
             echo ""
         fi
         
-        # Lê a senha
+        # Lê a senha com o campo visual
         local password=$(read_password_secure "🔑 Digite a senha:")
         local read_status=$?
         
@@ -245,6 +289,7 @@ extract_zip_smart() {
                 echo "  • Verifique se copiou a senha corretamente"
                 echo "  • Confirme com quem enviou o arquivo"
                 echo "  • Tente desativar Caps Lock"
+                echo "  • Verifique se há espaços antes ou depois da senha"
                 sleep 1
             fi
         fi
@@ -374,7 +419,7 @@ install_wine() {
         cat >> ~/.bashrc << 'EOF'
 
 # ════════════════════════════════════════════════════════════════
-# Configuração Wine 32-bit (Instalador Pawn v4.0)
+# Configuração Wine 32-bit (Instalador Pawn v4.1)
 # NÃO REMOVER - Necessário para compilar Pawn
 # ════════════════════════════════════════════════════════════════
 mkdir -p ~/.wine-runtime 2>/dev/null
@@ -392,7 +437,7 @@ EOF
             cat >> ~/.bash_profile << 'EOF'
 
 # ════════════════════════════════════════════════════════════════
-# Configuração Wine 32-bit (Instalador Pawn v4.0)
+# Configuração Wine 32-bit (Instalador Pawn v4.1)
 # ════════════════════════════════════════════════════════════════
 mkdir -p ~/.wine-runtime 2>/dev/null
 export XDG_RUNTIME_DIR=~/.wine-runtime
