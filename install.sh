@@ -1,26 +1,83 @@
 #!/bin/bash
 
-# Instalador Wine Pawn para VS Code v3.6
-# Melhorias: Verifica senha ANTES de tentar extrair
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  🚀 INSTALADOR WINE PAWN v4.0 - ULTRA SIMPLIFICADO           ║
+# ║  Automatizado • Inteligente • Rápido                         ║
+# ╚══════════════════════════════════════════════════════════════╝
 
-clear
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🚀 Instalador Wine Pawn + Playit v3.6"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-sleep 1
+set -e  # Para em caso de erro
 
 # ═══════════════════════════════════════════════════════════════
-# FUNÇÕES DE ENTRADA DE SENHA
+# 🎨 CORES E ESTILO
+# ═══════════════════════════════════════════════════════════════
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# ═══════════════════════════════════════════════════════════════
+# 🔧 FUNÇÕES AUXILIARES
 # ═══════════════════════════════════════════════════════════════
 
-# Função para entrada de senha com asteriscos
+print_header() {
+    clear
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${WHITE}  🚀 INSTALADOR WINE PAWN v4.0                                ${CYAN}║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+print_step() {
+    echo -e "\n${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}$1${NC}"
+    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+spinner() {
+    local pid=$1
+    local message=$2
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    
+    echo -n "$message "
+    while kill -0 $pid 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep 0.1
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+    wait $pid
+    return $?
+}
+
 read_password() {
     local prompt="$1"
     local password=""
     local char=""
     
-    echo -n "$prompt"
+    echo -ne "${CYAN}$prompt${NC}"
     
     stty -echo 2>/dev/null
     
@@ -36,7 +93,7 @@ read_password() {
             fi
         else
             password+="$char"
-            echo -n "*"
+            echo -n "●"
         fi
     done
     
@@ -46,196 +103,143 @@ read_password() {
     echo "$password"
 }
 
-# Função para verificar se arquivo ZIP tem senha
-check_zip_password() {
-    local zipfile="$1"
-    
-    # Tenta listar o conteúdo sem senha
-    if unzip -Z1 "$zipfile" >/dev/null 2>&1; then
-        return 1  # Não tem senha
-    else
-        return 0  # Tem senha ou arquivo corrompido
-    fi
-}
+# ═══════════════════════════════════════════════════════════════
+# 🔐 SISTEMA DE EXTRAÇÃO INTELIGENTE
+# ═══════════════════════════════════════════════════════════════
 
-# Função para extrair ZIP com verificação prévia de senha
-extract_zip_with_password() {
+smart_extract() {
     local zipfile="$1"
     local max_attempts=3
-    local attempt=1
     
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  🔐 Verificando Proteção do Arquivo ZIP"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    print_step "🔓 Sistema de Extração Inteligente"
     
-    # Verificar se o arquivo existe
+    # Verifica se arquivo existe
     if [ ! -f "$zipfile" ]; then
-        echo "❌ Arquivo não encontrado: $zipfile"
+        print_error "Arquivo não encontrado: $zipfile"
         return 1
     fi
     
-    # Verificar se tem senha ANTES de tentar extrair
-    if check_zip_password "$zipfile"; then
-        echo "🔐 Arquivo protegido por senha detectado!"
-        echo ""
+    print_info "Analisando: $zipfile [$(du -h "$zipfile" | cut -f1)]"
+    
+    # Tenta extrair sem senha primeiro
+    echo -ne "${BLUE}▶${NC} Tentando extrair automaticamente... "
+    if unzip -q -o "$zipfile" 2>/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+        print_success "Extração concluída!"
+        rm -f "$zipfile"
+        return 0
+    fi
+    echo -e "${YELLOW}SENHA NECESSÁRIA${NC}"
+    
+    # Precisa de senha
+    print_warning "Arquivo protegido por senha detectado"
+    echo ""
+    
+    for attempt in $(seq 1 $max_attempts); do
+        echo -e "${CYAN}╭─ Tentativa ${attempt}/${max_attempts}${NC}"
         
-        # Loop de tentativas com senha
-        while [ $attempt -le $max_attempts ]; do
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "  🔑 Tentativa $attempt de $max_attempts"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
+        local password=$(read_password "│ 🔑 Senha: ")
+        
+        if [ -z "$password" ]; then
+            echo -e "${CYAN}╰─${NC}"
+            print_warning "Senha vazia"
             
-            local password=$(read_password "🔑 Digite a senha do arquivo: ")
-            
-            if [ -z "$password" ]; then
-                echo "⚠️  Senha vazia fornecida"
-                echo ""
-                read -p "❓ Deseja tentar novamente? (S/n): " retry
-                
-                if [[ "$retry" =~ ^[Nn]$ ]]; then
-                    echo ""
-                    echo "❌ Extração cancelada pelo usuário"
-                    echo "📁 Arquivo mantido: $zipfile"
-                    return 1
-                fi
-                
-                attempt=$((attempt + 1))
-                echo ""
-                continue
+            if [ $attempt -lt $max_attempts ]; then
+                read -p "   Tentar novamente? (S/n): " retry
+                [[ "$retry" =~ ^[Nn]$ ]] && return 1
             fi
-            
-            echo "⏳ Extraindo com senha fornecida..."
-            
-            # Tentar extrair com a senha
-            if unzip -q -o -P "$password" "$zipfile" 2>/dev/null; then
-                echo "✅ Extração concluída com sucesso!"
-                rm -f "$zipfile"
-                return 0
-            else
-                echo "❌ Senha incorreta ou erro na extração"
-                
-                if [ $attempt -lt $max_attempts ]; then
-                    echo ""
-                    echo "💡 Dicas:"
-                    echo "  • Verifique se Caps Lock está desativado"
-                    echo "  • Verifique espaços extras na senha"
-                    echo "  • Confirme a senha com quem enviou o arquivo"
-                    echo ""
-                    sleep 2
-                fi
-                
-                attempt=$((attempt + 1))
-            fi
-        done
+            continue
+        fi
         
-        # Todas as tentativas falharam
-        echo ""
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "  ⚠️  Limite de Tentativas Atingido"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        echo "❌ Não foi possível extrair o arquivo"
-        echo "📁 Arquivo mantido: $zipfile"
-        echo ""
-        echo "💡 Você pode tentar extrair manualmente:"
-        echo "   unzip -P \"SUA_SENHA\" $zipfile"
-        echo ""
+        echo -ne "${CYAN}│${NC} ${BLUE}▶${NC} Extraindo com senha... "
         
-        return 1
-    else
-        # Arquivo SEM senha - extrair diretamente
-        echo "🔓 Arquivo sem proteção de senha detectado"
-        echo "⏳ Extraindo arquivo..."
-        
-        if unzip -q -o "$zipfile" 2>/dev/null; then
-            echo "✅ Extração concluída com sucesso!"
+        if unzip -q -o -P "$password" "$zipfile" 2>/dev/null; then
+            echo -e "${GREEN}OK${NC}"
+            echo -e "${CYAN}╰─${NC}"
+            print_success "Extração concluída com sucesso!"
             rm -f "$zipfile"
             return 0
         else
-            echo "❌ Erro ao extrair o arquivo"
-            echo "⚠️  O arquivo pode estar corrompido"
-            echo "📁 Arquivo mantido: $zipfile"
-            echo ""
-            echo "💡 Tente extrair manualmente com: unzip $zipfile"
-            return 1
+            echo -e "${RED}FALHOU${NC}"
+            echo -e "${CYAN}╰─${NC}"
+            print_error "Senha incorreta"
+            
+            if [ $attempt -lt $max_attempts ]; then
+                print_info "Dica: Verifique Caps Lock e espaços extras"
+                echo ""
+            fi
         fi
-    fi
+    done
+    
+    print_error "Limite de tentativas atingido"
+    print_info "Arquivo mantido: $zipfile"
+    print_info "Extraia manualmente: unzip -P \"sua_senha\" $zipfile"
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════
-# INÍCIO DA INSTALAÇÃO
+# 📦 INSTALAÇÃO DE PACOTES
 # ═══════════════════════════════════════════════════════════════
 
-# [1/9] Verificando extensões
-echo "🔍 [1/9] Verificando extensões do VS Code..."
-EXT_PAWN_INSTALLED=false
-EXT_TASK_INSTALLED=false
+install_package() {
+    local package=$1
+    local name=$2
+    
+    if command -v $package >/dev/null 2>&1; then
+        print_success "$name já instalado"
+        return 0
+    fi
+    
+    echo -ne "${BLUE}▶${NC} Instalando $name... "
+    sudo apt install -y $package >/dev/null 2>&1 &
+    spinner $! ""
+    print_success "$name instalado"
+}
 
-if code --list-extensions 2>/dev/null | grep -q "southclaws.vscode-pawn"; then
-    EXT_PAWN_INSTALLED=true
-    echo "✓ southclaws.vscode-pawn já instalada"
-fi
+# ═══════════════════════════════════════════════════════════════
+# 🚀 INÍCIO DA INSTALAÇÃO
+# ═══════════════════════════════════════════════════════════════
 
-if code --list-extensions 2>/dev/null | grep -q "sanaajani.taskrunnercode"; then
-    EXT_TASK_INSTALLED=true
-    echo "✓ sanaajani.taskrunnercode já instalada"
-fi
+print_header
 
-if [ "$EXT_PAWN_INSTALLED" = false ] && [ "$EXT_TASK_INSTALLED" = false ]; then
-    echo "⚠️  Nenhuma extensão detectada"
-fi
+print_step "📋 Etapa 1/5 • Verificação do Sistema"
 
-sleep 1
-echo ""
+# Dependências básicas
+print_info "Verificando dependências..."
+install_package "unzip" "UnZip"
+install_package "zip" "Zip"
+install_package "wget" "Wget"
+install_package "curl" "Curl"
 
-# [2/9] Verificação de diretórios
-echo "🔍 [2/9] Verificando estrutura de diretórios..."
-
-if [ -d "pawno" ] || [ -d "pawncc" ]; then
-    echo "✓ Compilador detectado - será preservado"
-fi
-
-if [ -d ".vscode" ]; then
-    echo "⚠️  Configuração .vscode/ existente - será atualizada"
-fi
-
-echo "✓ Verificação concluída"
-sleep 1
-echo ""
-
-# [3/9] Verificação e instalação do Wine
-echo "🍷 [3/9] Verificando Wine..."
-WINE_ALREADY_INSTALLED=false
+# ═══════════════════════════════════════════════════════════════
+print_step "🍷 Etapa 2/5 • Instalação do Wine"
 
 if command -v wine >/dev/null 2>&1; then
-    EXISTING_WINE_VER=$(wine --version 2>/dev/null)
-    if [ -n "$EXISTING_WINE_VER" ]; then
-        echo "✓ Wine já instalado: $EXISTING_WINE_VER"
-        WINE_ALREADY_INSTALLED=true
-    fi
-fi
-
-if [ "$WINE_ALREADY_INSTALLED" = false ]; then
-    echo "⏳ Instalando Wine 32-bit (2-5 minutos)..."
-    echo "⏳ Aguarde... Este processo pode demorar."
-    echo ""
+    print_success "Wine já instalado: $(wine --version 2>/dev/null)"
+else
+    print_info "Instalando Wine 32-bit (pode levar 2-5 minutos)..."
     
+    # Limpeza
     sudo apt remove --purge wine wine32 wine64 -y >/dev/null 2>&1
     sudo apt autoremove -y >/dev/null 2>&1
-    rm -rf ~/.wine
+    rm -rf ~/.wine 2>/dev/null
     
+    # Configuração
+    echo -ne "${BLUE}▶${NC} Configurando repositórios... "
     sudo dpkg --add-architecture i386 >/dev/null 2>&1
     sudo apt update >/dev/null 2>&1
     sudo mkdir -pm755 /etc/apt/keyrings >/dev/null 2>&1
-    sudo wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
-    sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+    sudo wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key 2>/dev/null
+    sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources 2>/dev/null
+    echo -e "${GREEN}OK${NC}"
     
+    # Instalação
+    echo -ne "${BLUE}▶${NC} Instalando Wine... "
     sudo apt update >/dev/null 2>&1
-    sudo apt install --install-recommends winehq-stable -y >/dev/null 2>&1
+    sudo apt install --install-recommends winehq-stable -y >/dev/null 2>&1 &
+    spinner $! ""
     
+    # Configuração do ambiente
     mkdir -p ~/.wine-runtime
     chmod 700 ~/.wine-runtime
     
@@ -245,115 +249,44 @@ if [ "$WINE_ALREADY_INSTALLED" = false ]; then
     export WINEDEBUG=-all
     export DISPLAY=:0
     
-    wineboot -u >/dev/null 2>&1
+    wineboot -u >/dev/null 2>&1 &
+    spinner $! "Inicializando Wine..."
     
+    # Persistir configurações
     if ! grep -q "WINEARCH=win32" ~/.bashrc; then
-        echo -e "\n# ═══════════════════════════════════════════════════" >> ~/.bashrc
-        echo "# Configuração Wine 32-bit (Auto-start)" >> ~/.bashrc
-        echo "# NÃO REMOVER - Necessário para compilar Pawn" >> ~/.bashrc
-        echo "# ═══════════════════════════════════════════════════" >> ~/.bashrc
-        echo "mkdir -p ~/.wine-runtime 2>/dev/null" >> ~/.bashrc
-        echo "export XDG_RUNTIME_DIR=~/.wine-runtime" >> ~/.bashrc
-        echo "export WINEARCH=win32" >> ~/.bashrc
-        echo "export WINEPREFIX=~/.wine" >> ~/.bashrc
-        echo "export WINEDEBUG=-all" >> ~/.bashrc
-        echo "export DISPLAY=:0" >> ~/.bashrc
+        cat >> ~/.bashrc << 'EOF'
+
+# ═══════════════════════════════════════════════════════════════
+# Wine 32-bit (Necessário para Pawn)
+# ═══════════════════════════════════════════════════════════════
+mkdir -p ~/.wine-runtime 2>/dev/null
+export XDG_RUNTIME_DIR=~/.wine-runtime
+export WINEARCH=win32
+export WINEPREFIX=~/.wine
+export WINEDEBUG=-all
+export DISPLAY=:0
+EOF
     fi
-    
-    if ! grep -q "WINEARCH=win32" ~/.bash_profile 2>/dev/null; then
-        echo -e "\n# ═══════════════════════════════════════════════════" >> ~/.bash_profile
-        echo "# Configuração Wine 32-bit (Auto-start)" >> ~/.bash_profile
-        echo "# NÃO REMOVER - Necessário para compilar Pawn" >> ~/.bash_profile
-        echo "# ═══════════════════════════════════════════════════" >> ~/.bash_profile
-        echo "mkdir -p ~/.wine-runtime 2>/dev/null" >> ~/.bash_profile
-        echo "export XDG_RUNTIME_DIR=~/.wine-runtime" >> ~/.bash_profile
-        echo "export WINEARCH=win32" >> ~/.bash_profile
-        echo "export WINEPREFIX=~/.wine" >> ~/.bash_profile
-        echo "export WINEDEBUG=-all" >> ~/.bash_profile
-        echo "export DISPLAY=:0" >> ~/.bash_profile
-    fi
-    
-    echo "✓ Variáveis configuradas em ~/.bashrc e ~/.bash_profile"
     
     source ~/.bashrc 2>/dev/null || true
     
     if command -v wine >/dev/null 2>&1; then
-        WINE_VERSION=$(wine --version 2>/dev/null)
-        echo "✓ Wine instalado com sucesso [$WINE_VERSION]"
+        print_success "Wine instalado: $(wine --version 2>/dev/null)"
     else
-        echo "❌ Falha ao instalar Wine"
+        print_error "Falha na instalação do Wine"
+        print_info "Execute: source ~/.bashrc"
         exit 1
     fi
 fi
 
-sleep 1
-echo ""
-
-# [4/9] VERIFICAÇÃO CRÍTICA DO WINE
-echo "🔍 [4/9] Verificando disponibilidade do Wine..."
-source ~/.bashrc 2>/dev/null || true
-
-export WINEARCH=win32
-export WINEPREFIX=~/.wine
-export WINEDEBUG=-all
-export XDG_RUNTIME_DIR=~/.wine-runtime
-
-if ! command -v wine >/dev/null 2>&1; then
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  ⚠️  ATENÇÃO: REINÍCIO NECESSÁRIO"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "O Wine foi instalado mas não está disponível neste terminal."
-    echo ""
-    echo "🔄 SOLUÇÕES:"
-    echo ""
-    echo "  1. Execute: source ~/.bashrc"
-    echo "  2. OU feche e reabra o terminal"
-    echo "  3. OU execute: exec bash"
-    echo ""
-    read -p "Pressione ENTER para tentar recarregar automaticamente..."
-    exec bash "$0"
-    exit 0
-fi
-
-echo "✓ Wine disponível no PATH"
-sleep 1
-echo ""
-
-# [5/9] Dependências
-echo "📦 [5/9] Verificando dependências..."
-DEPS_ALREADY_INSTALLED=true
-MISSING_DEPS=""
-
-command -v unzip >/dev/null 2>&1 || { DEPS_ALREADY_INSTALLED=false; MISSING_DEPS="$MISSING_DEPS unzip"; }
-command -v zip >/dev/null 2>&1 || { DEPS_ALREADY_INSTALLED=false; MISSING_DEPS="$MISSING_DEPS zip"; }
-command -v wget >/dev/null 2>&1 || { DEPS_ALREADY_INSTALLED=false; MISSING_DEPS="$MISSING_DEPS wget"; }
-command -v curl >/dev/null 2>&1 || { DEPS_ALREADY_INSTALLED=false; MISSING_DEPS="$MISSING_DEPS curl"; }
-
-if [ "$DEPS_ALREADY_INSTALLED" = true ]; then
-    echo "✓ Todas as dependências já instaladas"
-else
-    echo "⚠️  Instalando dependências:$MISSING_DEPS"
-    sudo apt install -y unzip zip wget curl >/dev/null 2>&1
-    echo "✓ Dependências instaladas com sucesso"
-fi
-
-sleep 1
-echo ""
-clear
-
-# [6/9] Configuração do ambiente VS Code
-echo "⚙️  [6/9] Configurando ambiente de desenvolvimento..."
+# ═══════════════════════════════════════════════════════════════
+print_step "⚙️  Etapa 3/5 • Configuração VS Code"
 
 mkdir -p .vscode
 
-cat > .vscode/settings.json << 'SETTINGS_EOF'
+# Settings.json
+cat > .vscode/settings.json << 'EOF'
 {
-    "// ⚠️  ATENÇÃO": "NÃO APAGUE ESTE ARQUIVO!",
-    "// Necessário": "Para compilar Pawn com Wine no Codespaces",
-    "// Documentação": "https://github.com/seu-repo (adicionar link se tiver)",
-    
     "terminal.integrated.env.linux": {
         "WINEARCH": "win32",
         "WINEPREFIX": "${env:HOME}/.wine",
@@ -362,282 +295,184 @@ cat > .vscode/settings.json << 'SETTINGS_EOF'
         "DISPLAY": ":0"
     }
 }
-SETTINGS_EOF
+EOF
+print_success "settings.json configurado"
 
-echo "✓ settings.json criado com variáveis Wine"
-
-echo "⏳ Baixando tasks.json..."
-wget -q https://github.com/48348484488/Maquina-VPS/raw/74c1d4876c3342d3df52d7db0142fef90f05f4bd/task.zip 2>&1
+# Tasks.json
+echo -ne "${BLUE}▶${NC} Baixando tasks.json... "
+wget -q https://github.com/48348484488/Maquina-VPS/raw/74c1d4876c3342d3df52d7db0142fef90f05f4bd/task.zip -O task.zip 2>&1
 
 if [ -f "task.zip" ]; then
-    TASK_SIZE=$(du -h task.zip | cut -f1)
-    echo "✓ Download concluído [$TASK_SIZE]"
-    echo ""
-    echo "📂 Extraindo configurações..."
+    echo -e "${GREEN}OK [$(du -h task.zip | cut -f1)]${NC}"
+    
     unzip -q -o task.zip
     rm -f task.zip
     
     if [ -d "vscode" ]; then
-        if [ -f ".vscode/settings.json" ]; then
-            mv .vscode/settings.json .vscode/settings.json.backup
-        fi
-        
+        [ -f ".vscode/settings.json" ] && mv .vscode/settings.json .vscode/settings.json.backup
         mv vscode/* .vscode/ 2>/dev/null
         rm -rf vscode
-        
-        if [ -f ".vscode/settings.json.backup" ]; then
-            mv .vscode/settings.json.backup .vscode/settings.json
-        fi
+        [ -f ".vscode/settings.json.backup" ] && mv .vscode/settings.json.backup .vscode/settings.json
     fi
     
     if [ -f ".vscode/tasks.json" ]; then
-        echo "✓ tasks.json configurado"
-        
-        if ! grep -q "NÃO APAGUE" .vscode/tasks.json; then
-            cp .vscode/tasks.json .vscode/tasks.json.tmp
-            
-            cat > .vscode/tasks.json << 'TASKS_HEADER'
-{
-    "// ⚠️  ATENÇÃO": "NÃO APAGUE ESTE ARQUIVO!",
-    "// Necessário": "Para compilar Pawn com Ctrl+Shift+B",
-TASKS_HEADER
-            
-            tail -n +2 .vscode/tasks.json.tmp >> .vscode/tasks.json
-            rm .vscode/tasks.json.tmp
-        fi
+        print_success "tasks.json configurado"
     else
-        echo "❌ Erro: tasks.json não encontrado no ZIP"
+        print_error "tasks.json não encontrado"
         exit 1
     fi
 else
-    echo "❌ Falha no download do task.zip"
+    echo -e "${RED}FALHOU${NC}"
     exit 1
 fi
 
-sleep 1
-echo ""
+# ═══════════════════════════════════════════════════════════════
+print_step "🔌 Etapa 4/5 • Extensões do VS Code"
 
-# [7/9] Extensões
-echo "🔌 [7/9] Instalando extensões do VS Code..."
+EXT_PAWN=$(code --list-extensions 2>/dev/null | grep -c "southclaws.vscode-pawn" || echo "0")
+EXT_TASK=$(code --list-extensions 2>/dev/null | grep -c "sanaajani.taskrunnercode" || echo "0")
 
-if [ "$EXT_PAWN_INSTALLED" = true ] && [ "$EXT_TASK_INSTALLED" = true ]; then
-    echo "✓ Extensões já instaladas - pulando"
+if [ "$EXT_PAWN" = "1" ]; then
+    print_success "Pawn Language já instalada"
 else
-    if [ "$EXT_PAWN_INSTALLED" = false ]; then
-        echo "⏳ Instalando southclaws.vscode-pawn..."
-        code --install-extension southclaws.vscode-pawn >/dev/null 2>&1
-    fi
-    
-    if [ "$EXT_TASK_INSTALLED" = false ]; then
-        echo "⏳ Instalando sanaajani.taskrunnercode..."
-        code --install-extension sanaajani.taskrunnercode >/dev/null 2>&1
-    fi
-    
-    sleep 2
-    
-    EXT_PAWN=$(code --list-extensions 2>/dev/null | grep -c "southclaws.vscode-pawn")
-    EXT_TASK=$(code --list-extensions 2>/dev/null | grep -c "sanaajani.taskrunnercode")
-    TOTAL_EXT=$((EXT_PAWN + EXT_TASK))
-    
-    if [ "$TOTAL_EXT" -eq 2 ]; then
-        echo "✓ Extensões confirmadas [2/2]"
-    elif [ "$TOTAL_EXT" -eq 1 ]; then
-        echo "⚠️  Extensões parcialmente instaladas [1/2]"
-        echo "⚠️  Solução: Recarregue a página (F5)"
-    else
-        echo "❌ Erro ao instalar extensões"
-        echo "❌ Solução: Recarregue a página (F5)"
-    fi
+    echo -ne "${BLUE}▶${NC} Instalando Pawn Language... "
+    code --install-extension southclaws.vscode-pawn >/dev/null 2>&1
+    echo -e "${GREEN}OK${NC}"
 fi
 
-sleep 1
-echo ""
-clear
+if [ "$EXT_TASK" = "1" ]; then
+    print_success "Task Runner já instalada"
+else
+    echo -ne "${BLUE}▶${NC} Instalando Task Runner... "
+    code --install-extension sanaajani.taskrunnercode >/dev/null 2>&1
+    echo -e "${GREEN}OK${NC}"
+fi
 
-# [8/9] Download MediaFire com verificação prévia de senha
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  📥 [8/9] Download do Arquivo MediaFire"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "Insira a URL completa do MediaFire:"
-echo "(Ex: https://www.mediafire.com/file/XXXXXXXXX/arquivo.zip/file)"
-echo ""
-echo "💡 Dica: Deixe em branco para pular"
-echo ""
-read -p "🔗 URL: " MEDIAFIRE_URL
-echo ""
+# ═══════════════════════════════════════════════════════════════
+print_step "📥 Etapa 5/5 • Download MediaFire (Opcional)"
 
-if [ -z "$MEDIAFIRE_URL" ]; then
-    echo "⚠️  URL não fornecida - pulando download"
-elif echo "$MEDIAFIRE_URL" | grep -q "mediafire.com"; then
-    echo "✓ URL do MediaFire detectada"
+echo -e "${CYAN}╭─ MediaFire Download${NC}"
+echo -e "${CYAN}│${NC}"
+read -p "$(echo -e ${CYAN}│${NC}) 🔗 URL (ou ENTER para pular): " MEDIAFIRE_URL
+echo -e "${CYAN}╰─${NC}"
+
+if [ -n "$MEDIAFIRE_URL" ] && echo "$MEDIAFIRE_URL" | grep -q "mediafire.com"; then
+    echo ""
     
     FILE_ID=$(echo "$MEDIAFIRE_URL" | grep -oP '(?<=file/)[^/]+' | head -1)
+    FILENAME=$(echo "$MEDIAFIRE_URL" | grep -oP '(?<=/)[^/]+(?=/file)' | head -1)
+    [ -z "$FILENAME" ] && FILENAME="gamemode.zip"
     
-    if [ -n "$FILE_ID" ]; then
-        FILENAME=$(echo "$MEDIAFIRE_URL" | grep -oP '(?<=/)[^/]+(?=/file)' | head -1)
-        [ -z "$FILENAME" ] && FILENAME="gamemode.zip"
+    print_info "Obtendo link direto..."
+    DIRECT_LINK=$(curl -sL "$MEDIAFIRE_URL" | grep -oP 'https://download[0-9]+\.mediafire\.com/[^"]+' | head -1)
+    
+    if [ -n "$DIRECT_LINK" ]; then
+        echo -ne "${BLUE}▶${NC} Baixando $FILENAME... "
+        wget -q "$DIRECT_LINK" -O "$FILENAME" 2>&1
+        echo -e "${GREEN}OK${NC}"
         
-        echo "☁️  Obtendo link direto..."
-        DIRECT_LINK=$(curl -sL "$MEDIAFIRE_URL" | grep -oP 'https://download[0-9]+\.mediafire\.com/[^"]+' | head -1)
-        
-        if [ -n "$DIRECT_LINK" ]; then
-            echo "⬇️  Baixando $FILENAME..."
-            wget -q --show-progress "$DIRECT_LINK" -O "$FILENAME" 2>&1
-            
-            if [ -f "$FILENAME" ]; then
-                echo ""
-                echo "✓ Download concluído [$(du -h "$FILENAME" | cut -f1)]"
-                
-                # Usar a função melhorada de extração (verifica senha ANTES)
-                extract_zip_with_password "$FILENAME"
-            else
-                echo "❌ Falha no download"
-            fi
-        else
-            echo "❌ Não foi possível obter link direto"
+        if [ -f "$FILENAME" ]; then
+            smart_extract "$FILENAME"
         fi
+    else
+        print_error "Link direto não encontrado"
     fi
+elif [ -n "$MEDIAFIRE_URL" ]; then
+    print_warning "URL inválida - deve ser do MediaFire"
 else
-    echo "❌ URL inválida - deve ser do MediaFire"
+    print_info "Download pulado"
 fi
 
-echo ""
-sleep 1
-clear
-
-# [9/9] INSTALAÇÃO DO PLAYIT
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🌐 [9/9] Instalando Playit (Túnel de Rede)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-PLAYIT_ALREADY_INSTALLED=false
+# ═══════════════════════════════════════════════════════════════
+print_step "🌐 BONUS • Playit (Túnel de Rede)"
 
 if command -v playit >/dev/null 2>&1; then
-    EXISTING_PLAYIT_VER=$(playit --version 2>/dev/null || echo "instalado")
-    if [ -n "$EXISTING_PLAYIT_VER" ]; then
-        echo "✓ Playit já instalado: $EXISTING_PLAYIT_VER"
-        PLAYIT_ALREADY_INSTALLED=true
-    fi
-fi
-
-if [ "$PLAYIT_ALREADY_INSTALLED" = false ]; then
-    echo "⏳ Adicionando chave GPG do repositório..."
+    print_success "Playit já instalado"
+else
+    echo -ne "${BLUE}▶${NC} Instalando Playit... "
     curl -fsSL https://playit-cloud.github.io/ppa/key.gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/playit-cloud.gpg 2>/dev/null
-    
-    echo "⏳ Adicionando repositório Playit..."
     sudo curl -fsSL -o /etc/apt/sources.list.d/playit-cloud.list https://playit-cloud.github.io/ppa/playit-cloud.list 2>/dev/null
-    
-    echo "⏳ Atualizando lista de pacotes..."
     sudo apt update >/dev/null 2>&1
-    
-    echo "⏳ Instalando Playit..."
-    sudo apt install playit -y >/dev/null 2>&1
+    sudo apt install playit -y >/dev/null 2>&1 &
+    spinner $! ""
     
     if command -v playit >/dev/null 2>&1; then
-        PLAYIT_VERSION=$(playit --version 2>/dev/null || echo "Desconhecida")
-        echo "✓ Playit instalado com sucesso [$PLAYIT_VERSION]"
+        print_success "Playit instalado"
     else
-        echo "❌ Erro na instalação do Playit"
-        echo "⚠️  O Pawn continuará funcionando normalmente"
+        print_warning "Playit não foi instalado (opcional)"
     fi
 fi
 
-echo ""
-sleep 1
-
 # ═══════════════════════════════════════════════════════════════
-# RELATÓRIO FINAL
+# 🎉 RELATÓRIO FINAL
 # ═══════════════════════════════════════════════════════════════
 
 clear
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  ✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+print_header
+
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║${WHITE}  ✓ INSTALAÇÃO CONCLUÍDA COM SUCESSO!                        ${GREEN}║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-echo "🧪 COMPONENTES INSTALADOS:"
+echo -e "${BOLD}📊 COMPONENTES INSTALADOS:${NC}"
 echo ""
+
+# Wine
 if command -v wine >/dev/null 2>&1; then
-    echo "  ✅ Wine: $(wine --version 2>/dev/null)"
-    echo "  ✅ Caminho: $(which wine)"
+    echo -e "  ${GREEN}✓${NC} Wine: ${CYAN}$(wine --version 2>/dev/null)${NC}"
 else
-    echo "  ❌ AVISO: Wine não detectado no PATH"
-    echo "  🔧 Execute: source ~/.bashrc"
+    echo -e "  ${RED}✗${NC} Wine: ${YELLOW}Execute 'source ~/.bashrc'${NC}"
 fi
 
-echo ""
+# Compilador
 if [ -f "pawno/pawncc.exe" ]; then
-    echo "  ✅ Compilador Pawn: pawno/pawncc.exe"
+    echo -e "  ${GREEN}✓${NC} Compilador: ${CYAN}pawno/pawncc.exe${NC}"
 elif [ -f "pawncc/pawncc.exe" ]; then
-    echo "  ✅ Compilador Pawn: pawncc/pawncc.exe"
+    echo -e "  ${GREEN}✓${NC} Compilador: ${CYAN}pawncc/pawncc.exe${NC}"
 else
-    echo "  ⚠️  Compilador Pawn: Aguardando arquivo"
+    echo -e "  ${YELLOW}⚠${NC} Compilador: ${YELLOW}Aguardando upload${NC}"
 fi
 
-echo ""
+# VS Code
 if [ -f ".vscode/settings.json" ] && [ -f ".vscode/tasks.json" ]; then
-    echo "  ✅ Configuração VS Code: OK"
+    echo -e "  ${GREEN}✓${NC} VS Code: ${CYAN}Configurado${NC}"
 else
-    echo "  ⚠️  Configuração VS Code: Incompleta"
+    echo -e "  ${RED}✗${NC} VS Code: ${YELLOW}Configuração incompleta${NC}"
+fi
+
+# Playit
+if command -v playit >/dev/null 2>&1; then
+    echo -e "  ${GREEN}✓${NC} Playit: ${CYAN}Instalado${NC}"
+else
+    echo -e "  ${YELLOW}⚠${NC} Playit: ${YELLOW}Não instalado${NC}"
 fi
 
 echo ""
-if command -v playit >/dev/null 2>&1; then
-    echo "  ✅ Playit: Instalado"
-else
-    echo "  ⚠️  Playit: Não instalado"
-fi
-
+echo -e "${BOLD}🚀 COMO USAR:${NC}"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🚀 COMO USAR"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${CYAN}┌─ Compilar Pawn${NC}"
+echo -e "${CYAN}│${NC}  1. Abra um arquivo .pwn"
+echo -e "${CYAN}│${NC}  2. Pressione: ${BOLD}Ctrl + Shift + B${NC}"
+echo -e "${CYAN}└─${NC}"
 echo ""
-echo "📝 COMPILAR PAWN:"
-echo "  • Abra um arquivo .pwn no VS Code"
-echo "  • Pressione: Ctrl + Shift + B"
-echo "  • Ou use o botão 'Run Task'"
-echo ""
-echo "🌐 USAR O PLAYIT:"
-echo "  • Execute a qualquer momento: playit"
-echo "  • Configure o túnel para a porta do seu servidor"
-echo "  • Útil para hospedar servidores SA-MP, FiveM, etc"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${CYAN}┌─ Usar Playit${NC}"
+echo -e "${CYAN}│${NC}  Digite: ${BOLD}playit${NC}"
+echo -e "${CYAN}└─${NC}"
 echo ""
 
-# Perguntar se quer executar o Playit agora
 if command -v playit >/dev/null 2>&1; then
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  🌐 Executar Playit Agora?"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "💡 O Playit permite expor seu servidor na internet"
-    echo "   sem precisar abrir portas no roteador."
-    echo ""
-    echo "📌 Você pode executar o Playit a qualquer momento"
-    echo "   digitando apenas: playit"
-    echo ""
-    read -p "❓ Deseja executar o Playit agora? (S/n): " RUN_PLAYIT
-    echo ""
+    echo -e "${BOLD}Execute o Playit agora?${NC}"
+    read -p "$(echo -e ${CYAN}▶${NC}) (S/n): " RUN_PLAYIT
     
     if [[ "$RUN_PLAYIT" =~ ^[Ss]$ ]] || [[ -z "$RUN_PLAYIT" ]]; then
-        echo "🚀 Iniciando Playit..."
         echo ""
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        print_info "Iniciando Playit..."
         echo ""
         playit
-    else
-        echo "✅ Playit não será executado agora."
-        echo "💡 Para executar depois, digite: playit"
-        echo ""
     fi
 fi
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "✅ Tudo pronto! Boa sorte com seu projeto Pawn!"
-echo ""
+echo -e "${GREEN}✓${NC} Tudo pronto! Boa sorte com seu projeto Pawn! 🎉"
+echo
