@@ -1,41 +1,170 @@
 #!/bin/bash
 
-# Instalador Wine Pawn para VS Code v3.4
-# Correções: Verificação de senha + Entrada mascarada + Persistência total
+# Instalador Wine Pawn para VS Code v3.5
+# Melhorias: Sistema de senha aprimorado + Validação robusta + UI melhorada
 
 clear
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🚀 Instalador Wine Pawn + Playit v3.4"
+echo "  🚀 Instalador Wine Pawn + Playit v3.5"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 sleep 1
 
-# Função para entrada de senha com asteriscos
+# ═══════════════════════════════════════════════════════════════
+# FUNÇÕES DE ENTRADA DE SENHA
+# ═══════════════════════════════════════════════════════════════
+
+# Função para entrada de senha com asteriscos (melhorada)
 read_password() {
+    local prompt="$1"
     local password=""
     local char=""
     
-    echo -n "$1"
+    echo -n "$prompt"
+    
+    # Desabilita echo do terminal
+    stty -echo 2>/dev/null
     
     while IFS= read -r -s -n1 char; do
-        if [[ $char == $'\0' ]]; then
+        # Enter pressionado
+        if [[ $char == $'\0' ]] || [[ $char == $'\n' ]] || [[ $char == $'\r' ]]; then
             break
         fi
         
-        if [[ $char == $'\177' ]]; then
+        # Backspace pressionado
+        if [[ $char == $'\177' ]] || [[ $char == $'\b' ]]; then
             if [ ${#password} -gt 0 ]; then
                 password="${password%?}"
                 echo -ne "\b \b"
             fi
         else
+            # Caractere normal
             password+="$char"
             echo -n "*"
         fi
     done
     
+    # Reabilita echo do terminal
+    stty echo 2>/dev/null
     echo ""
+    
+    # Retorna a senha
     echo "$password"
 }
+
+# Função para verificar se arquivo ZIP tem senha
+check_zip_password() {
+    local zipfile="$1"
+    
+    # Tenta listar o conteúdo sem senha
+    if unzip -Z1 "$zipfile" >/dev/null 2>&1; then
+        return 1  # Não tem senha
+    else
+        return 0  # Tem senha
+    fi
+}
+
+# Função para extrair ZIP com tentativas de senha
+extract_zip_with_password() {
+    local zipfile="$1"
+    local max_attempts=3
+    local attempt=1
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  🔐 Verificando proteção do arquivo ZIP"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # Primeira tentativa: sem senha
+    echo "🔓 Tentando extrair sem senha..."
+    if unzip -q -o "$zipfile" 2>/dev/null; then
+        echo "✅ Extração concluída com sucesso!"
+        rm -f "$zipfile"
+        return 0
+    fi
+    
+    # Verificar se realmente precisa de senha
+    if ! check_zip_password "$zipfile"; then
+        echo "⚠️  Arquivo pode estar corrompido"
+        echo "📁 Arquivo mantido: $zipfile"
+        echo ""
+        echo "💡 Tente extrair manualmente com: unzip $zipfile"
+        return 1
+    fi
+    
+    echo "🔐 Arquivo protegido por senha detectado!"
+    echo ""
+    
+    # Loop de tentativas com senha
+    while [ $attempt -le $max_attempts ]; do
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  🔑 Tentativa $attempt de $max_attempts"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        local password=$(read_password "🔑 Digite a senha do arquivo: ")
+        
+        if [ -z "$password" ]; then
+            echo "⚠️  Senha vazia fornecida"
+            echo ""
+            read -p "❓ Deseja tentar novamente? (S/n): " retry
+            
+            if [[ "$retry" =~ ^[Nn]$ ]]; then
+                echo ""
+                echo "❌ Extração cancelada pelo usuário"
+                echo "📁 Arquivo mantido: $zipfile"
+                return 1
+            fi
+            
+            attempt=$((attempt + 1))
+            echo ""
+            continue
+        fi
+        
+        echo "⏳ Extraindo com senha fornecida..."
+        
+        # Tentar extrair com a senha
+        if unzip -q -o -P "$password" "$zipfile" 2>/dev/null; then
+            echo "✅ Extração concluída com sucesso!"
+            rm -f "$zipfile"
+            return 0
+        else
+            echo "❌ Senha incorreta ou erro na extração"
+            
+            if [ $attempt -lt $max_attempts ]; then
+                echo ""
+                echo "💡 Dicas:"
+                echo "  • Verifique se Caps Lock está desativado"
+                echo "  • Verifique espaços extras na senha"
+                echo "  • Confirme a senha com quem enviou o arquivo"
+                echo ""
+                sleep 2
+            fi
+            
+            attempt=$((attempt + 1))
+        fi
+    done
+    
+    # Todas as tentativas falharam
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  ⚠️  Limite de tentativas atingido"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "❌ Não foi possível extrair o arquivo"
+    echo "📁 Arquivo mantido: $zipfile"
+    echo ""
+    echo "💡 Você pode tentar extrair manualmente:"
+    echo "   unzip -P \"SUA_SENHA\" $zipfile"
+    echo ""
+    
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════
+# INÍCIO DA INSTALAÇÃO
+# ═══════════════════════════════════════════════════════════════
 
 # [1/9] Verificando extensões
 echo "🔍 [1/9] Verificando extensões do VS Code..."
@@ -322,7 +451,7 @@ sleep 1
 echo ""
 clear
 
-# [8/9] Download MediaFire com verificação de senha
+# [8/9] Download MediaFire com sistema de senha aprimorado
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  📥 [8/9] Download do Arquivo MediaFire"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -356,86 +485,9 @@ elif echo "$MEDIAFIRE_URL" | grep -q "mediafire.com"; then
             if [ -f "$FILENAME" ]; then
                 echo ""
                 echo "✓ Download concluído [$(du -h "$FILENAME" | cut -f1)]"
-                echo ""
                 
-                # Verificar se o arquivo é ZIP válido
-                if ! unzip -t "$FILENAME" >/dev/null 2>&1; then
-                    echo "⚠️  Arquivo parece estar corrompido ou com senha"
-                    echo ""
-                    
-                    # Tentar extrair sem senha primeiro
-                    echo "🔓 Tentando extrair sem senha..."
-                    if unzip -q -o "$FILENAME" 2>/dev/null; then
-                        echo "✅ Extração concluída (sem senha)!"
-                        rm -f "$FILENAME"
-                    else
-                        echo "🔐 Arquivo protegido por senha detectado!"
-                        echo ""
-                        
-                        MAX_ATTEMPTS=3
-                        ATTEMPT=1
-                        EXTRACTED=false
-                        
-                        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$EXTRACTED" = false ]; do
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo "  🔑 Tentativa $ATTEMPT de $MAX_ATTEMPTS"
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo ""
-                            
-                            ZIP_PASSWORD=$(read_password "🔑 Digite a senha: ")
-                            
-                            if [ -z "$ZIP_PASSWORD" ]; then
-                                echo "⚠️  Senha vazia - tentando sem senha..."
-                                if unzip -q -o "$FILENAME" 2>/dev/null; then
-                                    echo "✅ Extração concluída!"
-                                    EXTRACTED=true
-                                    rm -f "$FILENAME"
-                                else
-                                    echo "❌ Falha na extração"
-                                fi
-                            else
-                                echo "⏳ Extraindo com senha..."
-                                if unzip -q -o -P "$ZIP_PASSWORD" "$FILENAME" 2>/dev/null; then
-                                    echo "✅ Extração concluída com sucesso!"
-                                    EXTRACTED=true
-                                    rm -f "$FILENAME"
-                                else
-                                    echo "❌ Senha incorreta ou erro na extração"
-                                    ATTEMPT=$((ATTEMPT + 1))
-                                    
-                                    if [ $ATTEMPT -le $MAX_ATTEMPTS ]; then
-                                        echo ""
-                                        echo "💡 Dica: Verifique se a senha está correta"
-                                        echo ""
-                                        sleep 2
-                                    fi
-                                fi
-                            fi
-                        done
-                        
-                        if [ "$EXTRACTED" = false ]; then
-                            echo ""
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo "  ⚠️  Limite de tentativas atingido"
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo ""
-                            echo "❌ Não foi possível extrair o arquivo"
-                            echo "📁 Arquivo mantido: $FILENAME"
-                            echo ""
-                            echo "💡 Você pode tentar extrair manualmente com:"
-                            echo "   unzip -P SENHA $FILENAME"
-                            echo ""
-                        fi
-                    fi
-                else
-                    echo "📂 Extraindo arquivos..."
-                    if unzip -q -o "$FILENAME" 2>/dev/null; then
-                        rm -f "$FILENAME"
-                        echo "✅ Extração concluída!"
-                    else
-                        echo "❌ Erro na extração - arquivo mantido: $FILENAME"
-                    fi
-                fi
+                # Usar a função melhorada de extração com senha
+                extract_zip_with_password "$FILENAME"
             else
                 echo "❌ Falha no download"
             fi
@@ -451,7 +503,7 @@ echo ""
 sleep 1
 clear
 
-# [9/9] INSTALAÇÃO DO PLAYIT (SEMPRE INSTALA SE NÃO ESTIVER)
+# [9/9] INSTALAÇÃO DO PLAYIT
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🌐 [9/9] Instalando Playit (Túnel de Rede)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -492,7 +544,10 @@ fi
 echo ""
 sleep 1
 
-# Relatório final
+# ═══════════════════════════════════════════════════════════════
+# RELATÓRIO FINAL
+# ═══════════════════════════════════════════════════════════════
+
 clear
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  ✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
