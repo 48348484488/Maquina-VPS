@@ -1,15 +1,41 @@
-cat > install-wine-pawn-playit.sh << 'SCRIPT_END'
 #!/bin/bash
 
-# Instalador Wine Pawn para VS Code v3.3
-# Correções: Persistência total + Avisos ao usuário + Playit
+# Instalador Wine Pawn para VS Code v3.4
+# Correções: Verificação de senha + Entrada mascarada + Persistência total
 
 clear
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🚀 Instalador Wine Pawn + Playit v3.3"
+echo "  🚀 Instalador Wine Pawn + Playit v3.4"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 sleep 1
+
+# Função para entrada de senha com asteriscos
+read_password() {
+    local password=""
+    local char=""
+    
+    echo -n "$1"
+    
+    while IFS= read -r -s -n1 char; do
+        if [[ $char == $'\0' ]]; then
+            break
+        fi
+        
+        if [[ $char == $'\177' ]]; then
+            if [ ${#password} -gt 0 ]; then
+                password="${password%?}"
+                echo -ne "\b \b"
+            fi
+        else
+            password+="$char"
+            echo -n "*"
+        fi
+    done
+    
+    echo ""
+    echo "$password"
+}
 
 # [1/9] Verificando extensões
 echo "🔍 [1/9] Verificando extensões do VS Code..."
@@ -296,7 +322,7 @@ sleep 1
 echo ""
 clear
 
-# [8/9] Download MediaFire
+# [8/9] Download MediaFire com verificação de senha
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  📥 [8/9] Download do Arquivo MediaFire"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -331,13 +357,84 @@ elif echo "$MEDIAFIRE_URL" | grep -q "mediafire.com"; then
                 echo ""
                 echo "✓ Download concluído [$(du -h "$FILENAME" | cut -f1)]"
                 echo ""
-                echo "📂 Extraindo arquivos..."
                 
-                if unzip -q -o "$FILENAME" 2>/dev/null; then
-                    rm -f "$FILENAME"
-                    echo "✅ Extração concluída!"
+                # Verificar se o arquivo é ZIP válido
+                if ! unzip -t "$FILENAME" >/dev/null 2>&1; then
+                    echo "⚠️  Arquivo parece estar corrompido ou com senha"
+                    echo ""
+                    
+                    # Tentar extrair sem senha primeiro
+                    echo "🔓 Tentando extrair sem senha..."
+                    if unzip -q -o "$FILENAME" 2>/dev/null; then
+                        echo "✅ Extração concluída (sem senha)!"
+                        rm -f "$FILENAME"
+                    else
+                        echo "🔐 Arquivo protegido por senha detectado!"
+                        echo ""
+                        
+                        MAX_ATTEMPTS=3
+                        ATTEMPT=1
+                        EXTRACTED=false
+                        
+                        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$EXTRACTED" = false ]; do
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "  🔑 Tentativa $ATTEMPT de $MAX_ATTEMPTS"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo ""
+                            
+                            ZIP_PASSWORD=$(read_password "🔑 Digite a senha: ")
+                            
+                            if [ -z "$ZIP_PASSWORD" ]; then
+                                echo "⚠️  Senha vazia - tentando sem senha..."
+                                if unzip -q -o "$FILENAME" 2>/dev/null; then
+                                    echo "✅ Extração concluída!"
+                                    EXTRACTED=true
+                                    rm -f "$FILENAME"
+                                else
+                                    echo "❌ Falha na extração"
+                                fi
+                            else
+                                echo "⏳ Extraindo com senha..."
+                                if unzip -q -o -P "$ZIP_PASSWORD" "$FILENAME" 2>/dev/null; then
+                                    echo "✅ Extração concluída com sucesso!"
+                                    EXTRACTED=true
+                                    rm -f "$FILENAME"
+                                else
+                                    echo "❌ Senha incorreta ou erro na extração"
+                                    ATTEMPT=$((ATTEMPT + 1))
+                                    
+                                    if [ $ATTEMPT -le $MAX_ATTEMPTS ]; then
+                                        echo ""
+                                        echo "💡 Dica: Verifique se a senha está correta"
+                                        echo ""
+                                        sleep 2
+                                    fi
+                                fi
+                            fi
+                        done
+                        
+                        if [ "$EXTRACTED" = false ]; then
+                            echo ""
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo "  ⚠️  Limite de tentativas atingido"
+                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo ""
+                            echo "❌ Não foi possível extrair o arquivo"
+                            echo "📁 Arquivo mantido: $FILENAME"
+                            echo ""
+                            echo "💡 Você pode tentar extrair manualmente com:"
+                            echo "   unzip -P SENHA $FILENAME"
+                            echo ""
+                        fi
+                    fi
                 else
-                    echo "❌ Erro na extração - arquivo mantido: $FILENAME"
+                    echo "📂 Extraindo arquivos..."
+                    if unzip -q -o "$FILENAME" 2>/dev/null; then
+                        rm -f "$FILENAME"
+                        echo "✅ Extração concluída!"
+                    else
+                        echo "❌ Erro na extração - arquivo mantido: $FILENAME"
+                    fi
                 fi
             else
                 echo "❌ Falha no download"
@@ -486,6 +583,3 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "✅ Tudo pronto! Boa sorte com seu projeto Pawn!"
 echo ""
-SCRIPT_END
-
-chmod +x install-wine-pawn-playit.sh && ./install-wine-pawn-playit.sh
