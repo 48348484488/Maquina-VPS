@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ════════════════════════════════════════════════════════════════
-# Instalador Wine Pawn + Playit v8.0 - VERSÃO CORRIGIDA
+# Instalador Wine Pawn + Playit v8.1 - VERSÃO COM MENU E SERVIDOR
 # ════════════════════════════════════════════════════════════════
 
 TEMP_DIR="/tmp/wine_installer_$$"
@@ -94,6 +94,37 @@ check_playit() {
 }
 
 # ════════════════════════════════════════════════════════════════
+# DETECTAR SERVIDOR SAMP
+# ════════════════════════════════════════════════════════════════
+
+find_samp_server() {
+    local locations=(
+        "./samp-server.exe"
+        "./server/samp-server.exe"
+        "./samp/samp-server.exe"
+        "./SA-MP/samp-server.exe"
+        "./SAMP/samp-server.exe"
+        "./gamemodes/../samp-server.exe"
+    )
+    
+    for loc in "${locations[@]}"; do
+        if [ -f "$loc" ]; then
+            echo "$loc"
+            return 0
+        fi
+    done
+    
+    # Busca recursiva (limitada a 3 níveis)
+    local found=$(find . -maxdepth 3 -name "samp-server.exe" -type f 2>/dev/null | head -1)
+    if [ -n "$found" ]; then
+        echo "$found"
+        return 0
+    fi
+    
+    return 1
+}
+
+# ════════════════════════════════════════════════════════════════
 # INSTALAR WINE (VERSÃO CORRIGIDA E MELHORADA)
 # ════════════════════════════════════════════════════════════════
 
@@ -105,14 +136,14 @@ install_wine() {
         local wine_version=$(wine --version 2>/dev/null | head -1)
         log_info "Wine já instalado: $wine_version"
         dialog --title "Wine Já Instalado" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Wine já está instalado!\n\nVersão: $wine_version" 9 50
         return 0
     fi
     
     # Aviso sobre tempo de instalação
     dialog --title "⏱️ Instalação do Wine" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --msgbox "A instalação do Wine pode demorar de 2 a 5 minutos.\n\nPor favor, aguarde pacientemente.\n\nNão feche o terminal durante a instalação!" 11 60
     
     (
@@ -191,7 +222,7 @@ install_wine() {
             cat >> ~/.bashrc << 'BASHRC'
 
 # ════════════════════════════════════════════════════════════════
-# Configuração Wine 32-bit (Instalador v8.0)
+# Configuração Wine 32-bit (Instalador v8.1)
 # ════════════════════════════════════════════════════════════════
 mkdir -p ~/.wine-runtime 2>/dev/null
 export XDG_RUNTIME_DIR=~/.wine-runtime
@@ -199,6 +230,9 @@ export WINEARCH=win32
 export WINEPREFIX=~/.wine
 export WINEDEBUG=-all
 export DISPLAY=:0
+
+# Comando 'menu' para abrir o instalador
+alias menu='bash ~/install_wine.sh'
 BASHRC
         fi
         
@@ -210,7 +244,7 @@ BASHRC
         log_info "Instalação concluída"
     ) | dialog \
         --title "Instalando Wine" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Iniciando instalação... (pode demorar de 2 a 5 minutos)" 10 70 0
     
     # Aguarda um momento para garantir que tudo foi instalado
@@ -224,13 +258,13 @@ BASHRC
         local wine_version=$(wine --version 2>/dev/null | head -1)
         log_info "Wine instalado com sucesso: $wine_version"
         dialog --title "✓ Sucesso" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
-            --msgbox "✓ Wine instalado com sucesso!\n\nVersão: $wine_version\n\n💡 Dica: Se tiver problemas, execute:\nsource ~/.bashrc" 12 55
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
+            --msgbox "✓ Wine instalado com sucesso!\n\nVersão: $wine_version\n\n💡 Dica: Digite 'menu' para abrir este instalador" 12 55
         return 0
     else
         log_error "Wine não está disponível após instalação"
         dialog --title "⚠️ Atenção" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "⚠️ Instalação concluída mas Wine não está no PATH.\n\nSOLUÇÕES:\n1. Execute: source ~/.bashrc\n2. Feche e reabra o terminal\n3. Reinicie este script\n\nSe persistir, verifique: $LOG_FILE" 14 60
         return 1
     fi
@@ -316,7 +350,7 @@ SETTINGS
         echo "100" ; sleep 0.2
     ) | dialog \
         --title "Configurando VS Code" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Processando..." 10 70 0
     
     sleep 1
@@ -326,13 +360,13 @@ SETTINGS
         if [ -f ".vscode/tasks.json" ]; then
             log_info "VS Code configurado completamente"
             dialog --title "✓ Sucesso" \
-                --backtitle "Instalador Wine Pawn + Playit v8.0" \
+                --backtitle "Instalador Wine Pawn + Playit v8.1" \
                 --msgbox "✓ VS Code configurado!\n\n• settings.json criado\n• tasks.json instalado" 10 50
             return 0
         else
             log_info "VS Code configurado parcialmente (sem tasks.json)"
             dialog --title "⚠️ Parcial" \
-                --backtitle "Instalador Wine Pawn + Playit v8.0" \
+                --backtitle "Instalador Wine Pawn + Playit v8.1" \
                 --msgbox "⚠️ Configuração parcial:\n\n• settings.json: OK\n• tasks.json: Falhou\n\nVocê pode criar tasks.json manualmente." 11 55
             return 0  # Considera sucesso parcial
         fi
@@ -352,7 +386,7 @@ install_extensions() {
     if ! command -v code &>/dev/null; then
         log_error "VS Code não encontrado"
         dialog --title "Erro" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ VS Code não está instalado!\n\nNo GitHub Codespaces, o VS Code já está instalado.\nSe estiver em outro ambiente, instale o VS Code primeiro." 11 60
         return 1
     fi
@@ -367,7 +401,7 @@ install_extensions() {
     if [ "$ext_pawn_installed" = true ] && [ "$ext_task_installed" = true ]; then
         log_info "Extensões já instaladas"
         dialog --title "Extensões Já Instaladas" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Todas as extensões já estão instaladas!\n\n• Pawn Language\n• Task Runner" 10 50
         return 0
     fi
@@ -398,7 +432,7 @@ install_extensions() {
         echo "100" ; sleep 0.5
     ) | dialog \
         --title "Instalando Extensões" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Processando..." 10 70 0
     
     # Aguarda sincronização
@@ -413,18 +447,18 @@ install_extensions() {
     
     if [ $count -eq 2 ]; then
         dialog --title "✓ Sucesso" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Extensões instaladas com sucesso!\n\nInstaladas: $count/2" 9 50
         return 0
     elif [ $count -eq 1 ]; then
         dialog --title "⚠️ Parcial" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "⚠️ Instalação parcial: $count/2\n\nRecarregue a página (F5) e tente novamente." 10 55
         return 0  # Considera sucesso parcial
     else
         log_error "Nenhuma extensão foi instalada"
         dialog --title "✗ Erro" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ Falha ao instalar extensões.\n\nVerifique o log: $LOG_FILE" 9 50
         return 1
     fi
@@ -441,7 +475,7 @@ install_playit() {
         local playit_version=$(playit --version 2>/dev/null || echo "instalado")
         log_info "Playit já instalado: $playit_version"
         dialog --title "Playit Já Instalado" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Playit já está instalado!\n\nVersão: $playit_version" 9 50
         return 0
     fi
@@ -480,7 +514,7 @@ install_playit() {
         echo "100" ; sleep 0.2
     ) | dialog \
         --title "Instalando Playit" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Processando..." 10 70 0
     
     sleep 1
@@ -489,13 +523,13 @@ install_playit() {
         local playit_version=$(playit --version 2>/dev/null || echo "Instalado")
         log_info "Playit instalado com sucesso: $playit_version"
         dialog --title "✓ Sucesso" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Playit instalado com sucesso!\n\nVersão: $playit_version" 9 50
         return 0
     else
         log_error "Playit não foi instalado corretamente"
         dialog --title "✗ Erro" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ Falha ao instalar Playit.\n\n⚠️ O Pawn continuará funcionando.\n\nVerifique: $LOG_FILE" 11 55
         return 1
     fi
@@ -521,18 +555,18 @@ extract_with_known_pass() {
         fi
     ) | dialog \
         --title "Extraindo Arquivo" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Processando: $name" 10 70 0
 
     if [ ${PIPESTATUS[0]} -eq 0 ]; then
         rm -f "$file"
         dialog --title "✓ Sucesso" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✓ Arquivo extraído!\n\n→ $name" 9 55
         return 0
     else
         dialog --title "✗ Erro" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ Falha na extração!\n\nArquivo: $name" 9 50
         return 1
     fi
@@ -546,7 +580,7 @@ extract_with_pass_manual() {
     for ((i=1; i<=$max_attempts; i++)); do
         local pass=$(dialog --stdout \
             --title "Senha Necessária ($i/$max_attempts)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --insecure \
             --passwordbox "Digite a senha para:\n\n→ $name" 11 60)
         
@@ -558,20 +592,20 @@ extract_with_pass_manual() {
             unzip -q -o -P "$pass" "$file" 2>/dev/null && echo "100"
         ) | dialog \
             --title "Extraindo ($i/$max_attempts)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --gauge "$name" 10 70 0
         
         if [ ${PIPESTATUS[0]} -eq 0 ]; then
             rm -f "$file"
             dialog --title "✓ Sucesso" \
-                --backtitle "Instalador Wine Pawn + Playit v8.0" \
+                --backtitle "Instalador Wine Pawn + Playit v8.1" \
                 --msgbox "✓ Arquivo extraído!" 7 40
             return 0
         fi
     done
     
     dialog --title "✗ Limite Excedido" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --msgbox "✗ Tentativas esgotadas." 7 40
     return 1
 }
@@ -583,7 +617,7 @@ extract_with_pass_manual() {
 download_mediafire() {
     local url=$(dialog --stdout \
         --title "MediaFire Download" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --inputbox "Cole a URL do MediaFire:" 10 70)
     
     [ $? -ne 0 ] || [ -z "$url" ] && return
@@ -592,7 +626,7 @@ download_mediafire() {
     
     if ! echo "$url" | grep -qE "mediafire\.com"; then
         dialog --title "Erro" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ URL inválida!" 7 40
         return
     fi
@@ -604,13 +638,13 @@ download_mediafire() {
     # Pergunta sobre senha
     local global_pass=""
     dialog --title "Arquivo Protegido?" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --yesno "O arquivo tem senha?" 8 50
     
     if [ $? -eq 0 ]; then
         global_pass=$(dialog --stdout \
             --title "Senha" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --insecure \
             --passwordbox "Digite a senha:" 9 50)
     fi
@@ -624,7 +658,7 @@ download_mediafire() {
         echo "100"
     ) | dialog \
         --title "Processando" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Conectando..." 10 70 0
     
     [ ! -f "$html_file" ] && return
@@ -649,7 +683,7 @@ download_mediafire() {
         sed -u 's/%//'
     ) | dialog \
         --title "Baixando: $filename" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --gauge "Aguarde..." 10 70 0
     
     [ ! -f "$filename" ] && return
@@ -659,11 +693,122 @@ download_mediafire() {
         extract_with_known_pass "$filename" "$global_pass"
     else
         dialog --title "Download Concluído" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --yesno "Extrair agora?" 8 40
         
         [ $? -eq 0 ] && extract_with_pass_manual "$filename"
     fi
+}
+
+# ════════════════════════════════════════════════════════════════
+# INICIAR SERVIDOR SAMP
+# ════════════════════════════════════════════════════════════════
+
+start_samp_server() {
+    log_info "Tentando iniciar servidor SA-MP"
+    
+    # Verifica Wine
+    if ! command -v wine &>/dev/null; then
+        dialog --title "Wine Não Instalado" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
+            --msgbox "✗ Wine não está instalado!\n\nInstale o Wine primeiro no menu principal." 9 50
+        return 1
+    fi
+    
+    # Busca servidor
+    local server_path=$(find_samp_server)
+    
+    if [ -z "$server_path" ]; then
+        dialog --title "Servidor Não Encontrado" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
+            --msgbox "✗ samp-server.exe não encontrado!\n\nLocais procurados:\n• ./samp-server.exe\n• ./server/samp-server.exe\n• ./samp/samp-server.exe\n• (busca recursiva em 3 níveis)\n\nColoque o servidor SA-MP na pasta atual." 14 60
+        return 1
+    fi
+    
+    local server_dir=$(dirname "$server_path")
+    local server_name=$(basename "$server_path")
+    
+    log_info "Servidor encontrado: $server_path"
+    
+    # Verifica server.cfg
+    local cfg_exists=false
+    if [ -f "$server_dir/server.cfg" ]; then
+        cfg_exists=true
+    fi
+    
+    # Mostra informações
+    local info_msg="📂 Servidor encontrado:\n$server_path\n\n"
+    
+    if [ "$cfg_exists" = true ]; then
+        info_msg+="✓ server.cfg: Encontrado\n\n"
+        
+        # Tenta extrair informações básicas
+        local port=$(grep -i "^port" "$server_dir/server.cfg" 2>/dev/null | cut -d' ' -f2 | tr -d '\r')
+        local hostname=$(grep -i "^hostname" "$server_dir/server.cfg" 2>/dev/null | cut -d' ' -f2- | tr -d '\r')
+        
+        [ -n "$port" ] && info_msg+="🔌 Porta: $port\n"
+        [ -n "$hostname" ] && info_msg+="📝 Nome: $hostname\n\n"
+    else
+        info_msg+="⚠️ server.cfg: NÃO encontrado\n\n"
+    fi
+    
+    info_msg+="O servidor será iniciado em uma nova janela.\n\n"
+    info_msg+="💡 Dica: Use Playit para expor na internet!"
+    
+    dialog --title "Iniciar Servidor SA-MP" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
+        --yesno "$info_msg" 18 65
+    
+    if [ $? -ne 0 ]; then
+        return 0
+    fi
+    
+    # Configuração do ambiente
+    export XDG_RUNTIME_DIR=~/.wine-runtime
+    export WINEARCH=win32
+    export WINEPREFIX=~/.wine
+    export WINEDEBUG=-all
+    export DISPLAY=:0
+    
+    mkdir -p ~/.wine-runtime 2>/dev/null
+    
+    clear
+    echo "════════════════════════════════════════════════════════"
+    echo "  🎮 INICIANDO SERVIDOR SA-MP"
+    echo "════════════════════════════════════════════════════════"
+    echo ""
+    echo "📂 Localização: $server_path"
+    echo "📁 Diretório: $server_dir"
+    echo ""
+    echo "════════════════════════════════════════════════════════"
+    echo ""
+    
+    log_info "Iniciando servidor: $server_path"
+    
+    # Entra no diretório do servidor
+    cd "$server_dir"
+    
+    # Inicia o servidor
+    wine "$server_name"
+    
+    local exit_code=$?
+    
+    echo ""
+    echo "════════════════════════════════════════════════════════"
+    if [ $exit_code -eq 0 ]; then
+        echo "  ✅ Servidor encerrado normalmente"
+        log_info "Servidor encerrado: código $exit_code"
+    else
+        echo "  ⚠️ Servidor encerrado com código: $exit_code"
+        log_error "Servidor encerrou com erro: código $exit_code"
+    fi
+    echo "════════════════════════════════════════════════════════"
+    echo ""
+    echo "Pressione ENTER para voltar ao menu..."
+    read
+    
+    # Volta ao diretório original
+    cd - >/dev/null 2>&1
 }
 
 # ════════════════════════════════════════════════════════════════
@@ -715,8 +860,24 @@ show_status() {
         compiler_status="✓ ./pawncc.exe"
     fi
     
+    local server_status="✗ Não encontrado"
+    local server_location="N/A"
+    local server_path=$(find_samp_server)
+    if [ -n "$server_path" ]; then
+        server_status="✓ Encontrado"
+        server_location="$server_path"
+        
+        # Verifica server.cfg
+        local server_dir=$(dirname "$server_path")
+        if [ -f "$server_dir/server.cfg" ]; then
+            server_status+=" (com server.cfg)"
+        else
+            server_status+=" (sem server.cfg)"
+        fi
+    fi
+    
     dialog --title "Status do Sistema" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --msgbox "══════════════════════════════════════
 
 🍷 WINE
@@ -725,6 +886,10 @@ show_status() {
 
 📦 COMPILADOR PAWN
    Status: $compiler_status
+
+🎮 SERVIDOR SA-MP
+   Status: $server_status
+   Local: $server_location
 
 ⚙️ VS CODE
    Config: $vscode_status
@@ -738,7 +903,10 @@ show_status() {
 📋 LOG DE DEBUG
    Arquivo: $LOG_FILE
 
-══════════════════════════════════════" 24 70
+💡 COMANDO RÁPIDO
+   Digite: menu (para abrir este instalador)
+
+══════════════════════════════════════" 28 75
 }
 
 # ════════════════════════════════════════════════════════════════
@@ -753,7 +921,7 @@ show_config_menu() {
     
     local choices=$(dialog --stdout \
         --title "Instalação Personalizada" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --checklist "Selecione os componentes (ESPAÇO marca/desmarca):" 16 75 4 \
         "1" "Wine 32-bit - $wine_check" off \
         "2" "VS Code Config - $vscode_check" off \
@@ -765,7 +933,7 @@ show_config_menu() {
     local count=$(echo "$choices" | wc -w)
     
     dialog --title "Confirmação de Instalação" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --yesno "Instalar $count componente(s) selecionado(s)?\n\nContinuar?" 9 50
     
     [ $? -ne 0 ] && return
@@ -778,7 +946,7 @@ show_config_menu() {
     
     if echo "$choices" | grep -q "1"; then
         dialog --title "Instalando ($current/$count)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --infobox "Instalando Wine..." 6 50
         
         if install_wine; then
@@ -794,7 +962,7 @@ show_config_menu() {
     
     if echo "$choices" | grep -q "2"; then
         dialog --title "Instalando ($current/$count)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --infobox "Configurando VS Code..." 6 50
         
         if configure_vscode; then
@@ -810,7 +978,7 @@ show_config_menu() {
     
     if echo "$choices" | grep -q "3"; then
         dialog --title "Instalando ($current/$count)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --infobox "Instalando extensões..." 6 50
         
         if install_extensions; then
@@ -826,7 +994,7 @@ show_config_menu() {
     
     if echo "$choices" | grep -q "4"; then
         dialog --title "Instalando ($current/$count)" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --infobox "Instalando Playit..." 6 50
         
         if install_playit; then
@@ -854,7 +1022,7 @@ show_config_menu() {
     fi
     
     dialog --title "Instalação Finalizada" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --msgbox "$message" 14 50
 }
 
@@ -865,13 +1033,13 @@ show_config_menu() {
 run_playit() {
     if ! command -v playit &>/dev/null; then
         dialog --title "Playit Não Instalado" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "✗ Playit não está instalado!\n\nInstale-o primeiro no menu principal." 9 50
         return
     fi
     
     dialog --title "Executar Playit" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --yesno "💡 O Playit permite expor seu servidor\nna internet sem abrir portas.\n\nO menu será fechado para executar.\n\nContinuar?" 12 55
     
     if [ $? -eq 0 ]; then
@@ -892,7 +1060,7 @@ run_playit() {
 show_debug_log() {
     if [ ! -f "$LOG_FILE" ]; then
         dialog --title "Log não encontrado" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --msgbox "Nenhum log de debug disponível ainda." 7 50
         return
     fi
@@ -900,7 +1068,7 @@ show_debug_log() {
     local lines=$(wc -l < "$LOG_FILE")
     
     dialog --title "Log de Debug ($lines linhas)" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
         --textbox "$LOG_FILE" 20 75
 }
 
@@ -911,14 +1079,36 @@ show_debug_log() {
 show_menu() {
     dialog --stdout \
         --title "Menu Principal" \
-        --backtitle "Instalador Wine Pawn + Playit v8.0" \
-        --menu "Escolha uma opção:" 18 70 7 \
+        --backtitle "Instalador Wine Pawn + Playit v8.1" \
+        --menu "Escolha uma opção:" 19 72 8 \
         "1" "Instalação Personalizada (Escolher componentes)" \
         "2" "MediaFire Download" \
         "3" "Status do Sistema" \
-        "4" "Executar Playit" \
-        "5" "Ver Log de Debug" \
+        "4" "Iniciar Servidor SA-MP" \
+        "5" "Executar Playit" \
+        "6" "Ver Log de Debug" \
         "0" "Sair"
+}
+
+# ════════════════════════════════════════════════════════════════
+# CRIAR COMANDO 'menu'
+# ════════════════════════════════════════════════════════════════
+
+setup_menu_command() {
+    local script_path=$(readlink -f "$0" 2>/dev/null || echo "$0")
+    
+    # Adiciona alias ao .bashrc se não existir
+    if ! grep -q "alias menu=" ~/.bashrc 2>/dev/null; then
+        cat >> ~/.bashrc << BASHEOF
+
+# ════════════════════════════════════════════════════════════════
+# Comando 'menu' - Instalador Wine Pawn + Playit v8.1
+# ════════════════════════════════════════════════════════════════
+alias menu='bash $script_path'
+BASHEOF
+        
+        log_info "Comando 'menu' adicionado ao .bashrc"
+    fi
 }
 
 # ════════════════════════════════════════════════════════════════
@@ -932,19 +1122,22 @@ if [ -f "$LOG_FILE" ]; then
 fi
 
 log_info "=========================================="
-log_info "Instalador Wine Pawn + Playit v8.0 INICIADO"
+log_info "Instalador Wine Pawn + Playit v8.1 INICIADO"
 log_info "=========================================="
 
+# Configura comando 'menu'
+setup_menu_command
+
 dialog --title "Bem-vindo" \
-    --backtitle "Instalador Wine Pawn + Playit v8.0" \
-    --msgbox "🚀 Instalador de Ambiente Pawn v8.0\n\n✓ Instalação Personalizada: Escolha componentes\n✓ MediaFire: Download e extração\n✓ Status: Veja o que está instalado\n✓ Playit: Execute o túnel de rede\n✓ Debug Log: Veja logs detalhados\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nNOVO NA v8.0:\n• Sistema de log detalhado\n• Detecção melhorada de erros\n• Relatórios mais informativos\n• Retornos de função corrigidos\n• Interface simplificada\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nUse SETAS para navegar\nENTER para selecionar" 24 65
+    --backtitle "Instalador Wine Pawn + Playit v8.1" \
+    --msgbox "🚀 Instalador de Ambiente Pawn v8.1\n\n✓ Instalação Personalizada: Escolha componentes\n✓ MediaFire: Download e extração\n✓ Status: Veja o que está instalado\n✓ Servidor SA-MP: Inicie seu servidor\n✓ Playit: Execute o túnel de rede\n✓ Debug Log: Veja logs detalhados\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nNOVO NA v8.1:\n• Comando 'menu' para abrir o instalador\n• Opção de iniciar servidor SA-MP\n• Detecção automática de samp-server.exe\n• Interface ainda mais completa\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 DICA: Digite 'menu' no terminal\n   para abrir este instalador!\n\nUse SETAS para navegar\nENTER para selecionar" 26 65
 
 while true; do
     choice=$(show_menu)
     
     if [ $? -ne 0 ]; then
         dialog --title "Confirmação" \
-            --backtitle "Instalador Wine Pawn + Playit v8.0" \
+            --backtitle "Instalador Wine Pawn + Playit v8.1" \
             --yesno "Deseja realmente sair?" 7 35
         
         if [ $? -eq 0 ]; then
@@ -958,8 +1151,9 @@ while true; do
         1) show_config_menu ;;
         2) download_mediafire ;;
         3) show_status ;;
-        4) run_playit ;;
-        5) show_debug_log ;;
+        4) start_samp_server ;;
+        5) run_playit ;;
+        6) show_debug_log ;;
         0) 
             log_info "Instalador encerrado pelo usuário"
             break 
@@ -973,10 +1167,12 @@ echo "════════════════════════�
 echo "  ✅ Instalador encerrado. Até logo!"
 echo "════════════════════════════════════════"
 echo ""
-echo "💡 Dica: Para ver o log completo, execute:"
-echo "   cat $LOG_FILE"
+echo "💡 Dicas úteis:"
+echo "   • Digite 'menu' para abrir o instalador"
+echo "   • Use 'source ~/.bashrc' para recarregar"
+echo "   • Log completo: cat $LOG_FILE"
 echo ""
 
 log_info "=========================================="
-log_info "Instalador Wine Pawn + Playit v8.0 ENCERRADO"
+log_info "Instalador Wine Pawn + Playit v8.1 ENCERRADO"
 log_info "=========================================="
